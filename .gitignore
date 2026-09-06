@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+
+# Kernel Module Build Artifacts
+*.ko
+*.mod
+*.mod.c
+*.mod.o
+*.o
+*.cmd
+.*.cmd
+.tmp_versions/
+modules.order
+Module.symvers
+.module-common.o
+..module-common.o.cmd
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*~
