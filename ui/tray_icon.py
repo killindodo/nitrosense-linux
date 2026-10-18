@@ -92,7 +92,7 @@ class NitroTrayIcon(QSystemTrayIcon):
         menu.addAction(self.act_manual)
 
         menu.addSeparator()
-        self.act_repo = QAction("🔗 GitHub Repository", self)
+        self.act_repo = QAction("🔗 GitHub: killindodo/nitrosense-linux", self)
         self.act_repo.triggered.connect(
             lambda: QDesktopServices.openUrl(QUrl("https://github.com/killindodo/nitrosense-linux"))
         )

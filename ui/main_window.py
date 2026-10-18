@@ -40,7 +40,7 @@ class NitroSenseWindow(QMainWindow):
         self.update_sensors()
 
     def _init_window(self):
-        self.setWindowTitle(f"NitroSense - {self.monitor.system_model} Fan & Thermal Controller")
+        self.setWindowTitle(f"NitroSense - {self.monitor.system_model} • Made by killindodo")
         self.resize(880, 720)
         self.setMinimumSize(780, 600)
         if os.path.exists(self.icon_path):
@@ -149,7 +149,7 @@ class NitroSenseWindow(QMainWindow):
         lbl_brand = QLabel("NITROSENSE LINUX")
         lbl_brand.setStyleSheet("color: #ff2e4c; font-size: 18px; font-weight: 900; letter-spacing: 1px;")
 
-        lbl_device = QLabel(f"{self.monitor.system_model} • Thermal & Fan Controller")
+        lbl_device = QLabel(f"{self.monitor.system_model} • Made with ❤️ by killindodo")
         lbl_device.setStyleSheet("color: #8b92a5; font-size: 12px;")
         title_box.addWidget(lbl_brand)
         title_box.addWidget(lbl_device)
@@ -302,10 +302,10 @@ class NitroSenseWindow(QMainWindow):
         ftr_layout = QHBoxLayout(footer)
         ftr_layout.setContentsMargins(14, 6, 14, 6)
 
-        lbl_author = QLabel("⚡ NitroSense Linux • Fan & Thermal Controller")
+        lbl_author = QLabel("⚡ Made with ❤️ by <b style='color: #ff2e4c;'>killindodo</b>")
         lbl_author.setStyleSheet("color: #9aa1b5; font-size: 11px;")
 
-        lbl_repo = QLabel("<a href='https://github.com/killindodo/nitrosense-linux' style='color: #00d2ff; text-decoration: none;'>🔗 GitHub Repository</a>")
+        lbl_repo = QLabel("<a href='https://github.com/killindodo/nitrosense-linux' style='color: #00d2ff; text-decoration: none;'>🔗 github.com/killindodo/nitrosense-linux</a>")
         lbl_repo.setOpenExternalLinks(True)
         lbl_repo.setStyleSheet("font-size: 11px;")
 

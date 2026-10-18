@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """
 NitroSense Linux - Advanced Fan & Thermal Controller for Acer Nitro Laptops
+Developer: killindodo (https://github.com/killindodo)
 Repository: https://github.com/killindodo/nitrosense-linux
 """
 
+__author__ = "killindodo"
 __version__ = "1.1.0"
 __github__ = "https://github.com/killindodo/nitrosense-linux"
 

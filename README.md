@@ -2,6 +2,9 @@
 
 A dedicated, native Linux GUI and Embedded Controller (EC) fan driver for **Acer Nitro laptops**.
 
+**Developer**: [killindodo](https://github.com/killindodo)  
+**Repository**: [https://github.com/killindodo/nitrosense-linux](https://github.com/killindodo/nitrosense-linux)
+
 ![NitroSense Linux](assets/icon.png)
 
 ---
@@ -127,6 +130,14 @@ nitrosense --tray
 - **Click the top status bar widget** to open the **Mini Control Dropdown**.
 - **Double-click** or click **Dashboard** in the dropdown to expand the full dashboard.
 - **Right-click** for quick context menu presets.
+
+---
+
+## Author
+
+Made with ❤️ by **[killindodo](https://github.com/killindodo)**  
+- GitHub: [@killindodo](https://github.com/killindodo)  
+- Repository: [https://github.com/killindodo/nitrosense-linux](https://github.com/killindodo/nitrosense-linux)
 
 ---
 

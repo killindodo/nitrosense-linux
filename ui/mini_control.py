@@ -184,7 +184,7 @@ class MiniControlDropdown(QWidget):
         title_vbox.setSpacing(0)
         self.lbl_title = QLabel("NITROSENSE")
         self.lbl_title.setStyleSheet("color: #ffffff; font-size: 12px; font-weight: 900; letter-spacing: 0.5px;")
-        self.lbl_sub = QLabel(self.system_model)
+        self.lbl_sub = QLabel(f"{self.system_model} • by killindodo")
         self.lbl_sub.setStyleSheet("color: #8a90a2; font-size: 10px;")
         title_vbox.addWidget(self.lbl_title)
         title_vbox.addWidget(self.lbl_sub)
