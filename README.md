@@ -18,6 +18,24 @@ NitroSense Linux bridges this gap by combining:
 
 ---
 
+## Previews
+
+<div align="center">
+  <h3>Top Status Bar Mini Control Dropdown</h3>
+  <p><i>Instant 1-click monitoring and fan control right from your top panel</i></p>
+  <img src="assets/mini_control_preview.png" alt="NitroSense Top Status Bar Mini Control Dropdown" width="360" />
+</div>
+
+<br/>
+
+<div align="center">
+  <h3>Full NitroSense Dashboard</h3>
+  <p><i>Real-time circular dials, rolling thermal dynamic graph, and dual fan controls</i></p>
+  <img src="assets/dashboard_preview.png" alt="NitroSense Linux Full Dashboard" width="850" />
+</div>
+
+---
+
 ## Features
 
 - **Top Status Bar Mini Control Dropdown**:
