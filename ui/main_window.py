@@ -40,7 +40,7 @@ class NitroSenseWindow(QMainWindow):
         self.update_sensors()
 
     def _init_window(self):
-        self.setWindowTitle("NitroSense - Acer Nitro 5 Fan & Thermal Controller")
+        self.setWindowTitle(f"NitroSense - {self.monitor.system_model} Fan & Thermal Controller")
         self.resize(880, 720)
         self.setMinimumSize(780, 600)
         if os.path.exists(self.icon_path):
@@ -149,7 +149,7 @@ class NitroSenseWindow(QMainWindow):
         lbl_brand = QLabel("NITROSENSE LINUX")
         lbl_brand.setStyleSheet("color: #ff2e4c; font-size: 18px; font-weight: 900; letter-spacing: 1px;")
 
-        lbl_device = QLabel("Acer Nitro 5 (AN515-42) • Developed by killindodo")
+        lbl_device = QLabel(f"{self.monitor.system_model} • Thermal & Fan Controller")
         lbl_device.setStyleSheet("color: #8b92a5; font-size: 12px;")
         title_box.addWidget(lbl_brand)
         title_box.addWidget(lbl_device)
@@ -302,14 +302,14 @@ class NitroSenseWindow(QMainWindow):
         ftr_layout = QHBoxLayout(footer)
         ftr_layout.setContentsMargins(14, 6, 14, 6)
 
-        lbl_author = QLabel("⚡ Developed by <b style='color: #ff2e4c;'>killindodo</b>")
+        lbl_author = QLabel("⚡ NitroSense Linux • Fan & Thermal Controller")
         lbl_author.setStyleSheet("color: #9aa1b5; font-size: 11px;")
 
-        lbl_repo = QLabel("<a href='https://github.com/killindodo/nitrosense-linux' style='color: #00d2ff; text-decoration: none;'>🔗 github.com/killindodo/nitrosense-linux</a>")
+        lbl_repo = QLabel("<a href='https://github.com/killindodo/nitrosense-linux' style='color: #00d2ff; text-decoration: none;'>🔗 GitHub Repository</a>")
         lbl_repo.setOpenExternalLinks(True)
         lbl_repo.setStyleSheet("font-size: 11px;")
 
-        lbl_version = QLabel("NitroSense Linux v1.0.0")
+        lbl_version = QLabel("NitroSense Linux v1.1.0")
         lbl_version.setStyleSheet("color: #63697a; font-size: 11px;")
 
         ftr_layout.addWidget(lbl_author)
@@ -321,8 +321,10 @@ class NitroSenseWindow(QMainWindow):
         main_layout.addWidget(footer)
 
     def _setup_tray(self):
-        self.tray = NitroTrayIcon(self.icon_path, self)
+        self.tray = NitroTrayIcon(self.icon_path, self.monitor.system_model, self)
         self.tray.mode_requested.connect(self.set_mode)
+        self.tray.speed_changed.connect(self._on_tray_speed_changed)
+        self.tray.sync_toggled.connect(self._on_tray_sync_toggled)
         self.tray.toggle_window_requested.connect(self.toggle_visibility)
         self.tray.quit_requested.connect(self.close)
         self.tray.show()
@@ -342,6 +344,7 @@ class NitroSenseWindow(QMainWindow):
     def set_mode(self, mode: int):
         self.controller.set_mode(mode)
         self._update_mode_buttons(mode)
+        self.tray.set_mode(mode)
 
     def _update_mode_buttons(self, mode: int):
         self.btn_auto.setChecked(mode == FanMode.AUTO)
@@ -362,25 +365,39 @@ class NitroSenseWindow(QMainWindow):
 
     def _on_sync_toggled(self, checked: bool):
         self.controller.synced = checked
+        self.tray.set_sync(checked)
         if checked:
             # Sync GPU slider to CPU slider
             val = self.card_cpu_fan.slider.value()
             self.card_gpu_fan.set_speed_pct(val)
             self.controller.apply_speeds(val, val)
+            self.tray.set_slider_values(val, val)
 
     def _on_cpu_speed_slider(self, val: int):
         gpu_val = val if self.chk_sync.isChecked() else self.card_gpu_fan.slider.value()
         if self.chk_sync.isChecked():
             self.card_gpu_fan.set_speed_pct(val)
         self.controller.apply_speeds(val, gpu_val)
+        self.tray.set_slider_values(val, gpu_val)
 
     def _on_gpu_speed_slider(self, val: int):
         if self.chk_sync.isChecked():
             self.card_cpu_fan.set_speed_pct(val)
             self.controller.apply_speeds(val, val)
+            self.tray.set_slider_values(val, val)
         else:
             cpu_val = self.card_cpu_fan.slider.value()
             self.controller.apply_speeds(cpu_val, val)
+            self.tray.set_slider_values(cpu_val, val)
+
+    def _on_tray_speed_changed(self, cpu_val: int, gpu_val: int):
+        self.card_cpu_fan.set_speed_pct(cpu_val)
+        self.card_gpu_fan.set_speed_pct(gpu_val)
+        self.controller.apply_speeds(cpu_val, gpu_val)
+
+    def _on_tray_sync_toggled(self, checked: bool):
+        self.chk_sync.setChecked(checked)
+        self.controller.synced = checked
 
     @pyqtSlot()
     def update_sensors(self):
@@ -419,7 +436,7 @@ class NitroSenseWindow(QMainWindow):
 
         # Update CPU Gauge
         if snap.cpu_temp is not None:
-            self.gauge_cpu_temp.set_value(snap.cpu_temp, "Ryzen Core")
+            self.gauge_cpu_temp.set_value(snap.cpu_temp, snap.cpu_label)
         else:
             self.gauge_cpu_temp.set_value(0, "Offline")
 
@@ -430,11 +447,11 @@ class NitroSenseWindow(QMainWindow):
                 sub = f"{snap.dgpu_power_w:.1f}W"
             if snap.dgpu_sclk_mhz is not None:
                 sub += f" • {snap.dgpu_sclk_mhz}MHz"
-            self.gauge_gpu_temp.set_value(snap.dgpu_temp, sub or "RX 560X")
-            self.lbl_dgpu_info.setText(f"Discrete GPU: {snap.dgpu_temp:.1f}°C ({sub})")
+            self.gauge_gpu_temp.set_value(snap.dgpu_temp, sub or snap.dgpu_name)
+            self.lbl_dgpu_info.setText(f"Discrete GPU: {snap.dgpu_temp:.1f}°C ({sub or snap.dgpu_name})")
         elif snap.igpu_temp is not None:
-            self.gauge_gpu_temp.set_value(snap.igpu_temp, "Vega iGPU")
-            self.lbl_dgpu_info.setText("Discrete GPU: Standby (Low Power) • Vega iGPU Active")
+            self.gauge_gpu_temp.set_value(snap.igpu_temp, snap.igpu_name)
+            self.lbl_dgpu_info.setText(f"Discrete GPU: Standby • {snap.igpu_name} Active")
         else:
             self.gauge_gpu_temp.set_value(0, "Sleeping")
             self.lbl_dgpu_info.setText("Discrete GPU: Sleeping")
@@ -453,15 +470,8 @@ class NitroSenseWindow(QMainWindow):
         # Execute curve & safety ticks
         self.controller.tick_safety_and_curve(snap.cpu_temp, best_gpu_temp)
 
-        # Update Tray Tooltip
-        mode_str = ["Turbo", "Manual", "Auto", "SmartCurve"][self.controller.active_mode]
-        self.tray.update_tooltip(
-            snap.cpu_temp,
-            best_gpu_temp,
-            snap.cpu_fan_rpm,
-            snap.gpu_fan_rpm,
-            mode_str,
-        )
+        # Update Tray Tooltip and Mini Control Dropdown
+        self.tray.update_snapshot(snap, self.controller.active_mode)
 
     def _on_install_driver_clicked(self):
         script = os.path.join(self.project_root, "scripts", "install_driver.sh")
@@ -470,7 +480,7 @@ class NitroSenseWindow(QMainWindow):
         msg.setIcon(QMessageBox.Icon.Information)
         msg.setText("Would you like to install and activate the Acer Nitro EC fan driver?")
         msg.setInformativeText(
-            "This will compile the acer-nitro-ec kernel module for AN515-42, "
+            f"This will compile the acer-nitro-ec kernel module for your {self.monitor.system_model}, "
             "install it with DKMS for automatic kernel updates, and configure udev rules "
             "so you can control fan speeds without entering a password.\n\n"
             "An authorization prompt (pkexec) will appear asking for your password."

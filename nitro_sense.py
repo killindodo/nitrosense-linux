@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 """
-NitroSense Linux - Advanced Fan & Thermal Controller for Acer Nitro 5 AN515-42
-Developer: killindodo (https://github.com/killindodo)
+NitroSense Linux - Advanced Fan & Thermal Controller for Acer Nitro Laptops
 Repository: https://github.com/killindodo/nitrosense-linux
 """
 
-__author__ = "killindodo"
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 __github__ = "https://github.com/killindodo/nitrosense-linux"
 
 import sys
@@ -22,11 +20,12 @@ if PROJECT_DIR not in sys.path:
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import QIcon
 from PyQt6.QtCore import QTimer
+from PyQt6.QtNetwork import QLocalServer, QLocalSocket
 from ui.main_window import NitroSenseWindow
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Acer Nitro 5 Fan and Thermal Controller")
+    parser = argparse.ArgumentParser(description="Acer Nitro Fan and Thermal Controller")
     parser.add_argument("--tray", action="store_true", help="Start minimized to the system tray")
     args = parser.parse_args()
 
@@ -35,11 +34,33 @@ def main():
     app.setApplicationDisplayName("NitroSense")
     app.setDesktopFileName("nitrosense")
 
+    # Single-instance enforcement
+    server_name = f"nitrosense_{os.getuid()}"
+    socket = QLocalSocket()
+    socket.connectToServer(server_name)
+    if socket.waitForConnected(500):
+        # Already running: bring existing window to front
+        socket.write(b"SHOW\n")
+        socket.waitForBytesWritten(500)
+        socket.disconnectFromServer()
+        sys.exit(0)
+
+    local_server = QLocalServer()
+    local_server.removeServer(server_name)
+    local_server.listen(server_name)
+
     icon_path = os.path.join(PROJECT_DIR, "assets", "icon.png")
     if os.path.exists(icon_path):
         app.setWindowIcon(QIcon(icon_path))
 
     window = NitroSenseWindow(PROJECT_DIR)
+
+    def on_new_connection():
+        client_sock = local_server.nextPendingConnection()
+        if client_sock:
+            client_sock.readyRead.connect(lambda: (window.showNormal(), window.activateWindow()))
+
+    local_server.newConnection.connect(on_new_connection)
 
     if not args.tray:
         window.show()

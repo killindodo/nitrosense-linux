@@ -1,50 +1,24 @@
 """
-Hardware sensor reader for Acer Nitro 5 (AN515-42 and compatible models).
-Reads CPU, dGPU (RX 560X), iGPU (Vega) temperatures, power, clocks,
+Hardware sensor reader for Acer Nitro laptops.
+Dynamically discovers and monitors CPU, discrete GPU, integrated GPU,
 and Embedded Controller (EC) fan RPM and PWM states.
+
+Privacy & Security:
+- 100% local, offline monitoring with zero telemetry.
+- No network queries, no IP/MAC reading, and no hardware serial/UUID collection.
+- All hardware paths and model strings are detected dynamically without hardcoding.
 """
 
 import os
+import re
 import glob
+import subprocess
 from dataclasses import dataclass
 from typing import Optional, Tuple, Dict, Any
 
 
-@dataclass
-class ThermalSnapshot:
-    # CPU
-    cpu_temp: Optional[float] = None
-    cpu_label: str = "AMD Ryzen"
-    
-    # Discrete GPU (RX 560X)
-    dgpu_temp: Optional[float] = None
-    dgpu_power_w: Optional[float] = None
-    dgpu_sclk_mhz: Optional[int] = None
-    dgpu_mclk_mhz: Optional[int] = None
-    dgpu_active: bool = False
-    dgpu_name: str = "Radeon RX 560X"
-    
-    # Integrated GPU (Vega)
-    igpu_temp: Optional[float] = None
-    igpu_name: str = "Radeon Vega"
-    
-    # Fans (via acer-nitro-ec)
-    ec_available: bool = False
-    ec_writable: bool = False
-    ec_path: Optional[str] = None
-    
-    cpu_fan_rpm: int = 0
-    gpu_fan_rpm: int = 0
-    
-    cpu_fan_pct: int = 0
-    gpu_fan_pct: int = 0
-    
-    # 0 = Turbo, 1 = Manual, 2 = Auto
-    cpu_fan_mode: int = 2
-    gpu_fan_mode: int = 2
-
-
 def _read_str(path: str) -> Optional[str]:
+    """Safely reads a single line from a sysfs or procfs entry."""
     try:
         with open(path, "r") as f:
             return f.read().strip()
@@ -53,6 +27,7 @@ def _read_str(path: str) -> Optional[str]:
 
 
 def _read_int(path: str) -> Optional[int]:
+    """Safely reads an integer from a sysfs entry."""
     val = _read_str(path)
     if val is not None:
         try:
@@ -62,58 +37,223 @@ def _read_int(path: str) -> Optional[int]:
     return None
 
 
+def get_system_model() -> str:
+    """
+    Dynamically identifies the laptop model without hardcoding.
+    Returns e.g. 'Acer Nitro AN515-42' or 'Acer Nitro Series'.
+    """
+    vendor = _read_str("/sys/class/dmi/id/sys_vendor") or ""
+    product = _read_str("/sys/class/dmi/id/product_name") or ""
+
+    if vendor and product:
+        # Avoid duplicate vendor name if product already includes it
+        if vendor.lower() in product.lower():
+            return product
+        return f"{vendor} {product}"
+    elif product:
+        return product
+    return "Acer Nitro Series"
+
+
+def get_cpu_model_name() -> str:
+    """
+    Dynamically reads CPU model name from /proc/cpuinfo.
+    Cleans up redundant marketing suffixes.
+    """
+    try:
+        with open("/proc/cpuinfo", "r") as f:
+            for line in f:
+                if "model name" in line:
+                    raw = line.split(":", 1)[1].strip()
+                    clean = raw
+                    for noise in [
+                        " with Radeon Vega Mobile Gfx",
+                        " with Radeon Graphics",
+                        " Processor",
+                        " CPU",
+                    ]:
+                        clean = clean.replace(noise, "")
+                    return clean
+    except Exception:
+        pass
+    return "Processor"
+
+
+def get_gpu_descriptions() -> Dict[str, str]:
+    """
+    Dynamically extracts concise GPU names from lspci.
+    Returns mapping of PCI slot (e.g. '0000:01:00.0') to clean GPU name.
+    """
+    gpu_names: Dict[str, str] = {}
+    try:
+        out = subprocess.check_output(["lspci"], text=True, stderr=subprocess.DEVNULL)
+        for line in out.splitlines():
+            if "controller:" in line and any(k in line for k in ["VGA", "3D", "Display"]):
+                slot_id = line.split()[0]
+                if not slot_id.startswith("0000:"):
+                    slot_id = f"0000:{slot_id}"
+                desc = line.split("controller:", 1)[1].strip()
+                # Remove common vendor prefixes
+                desc = re.sub(
+                    r"^(Advanced Micro Devices, Inc\. \[AMD/ATI\]|NVIDIA Corporation|Intel Corporation)\s*",
+                    "",
+                    desc,
+                )
+                desc = re.sub(r"\s*\(rev\s+[0-9a-fA-F]+\)\s*$", "", desc)
+
+                # Prefer text inside brackets if available
+                bracket_match = re.search(r"\[(.*?)\]", desc)
+                if bracket_match:
+                    name_candidate = bracket_match.group(1)
+                    if "/" in name_candidate:
+                        # Extract first variant or concise family
+                        name_candidate = name_candidate.split("/")[0].strip()
+                    gpu_names[slot_id] = name_candidate
+                else:
+                    gpu_names[slot_id] = desc
+    except Exception:
+        pass
+    return gpu_names
+
+
+@dataclass
+class ThermalSnapshot:
+    # System / Laptop Model
+    system_model: str = "Acer Nitro"
+
+    # CPU
+    cpu_temp: Optional[float] = None
+    cpu_label: str = "CPU Core"
+
+    # Discrete GPU
+    dgpu_temp: Optional[float] = None
+    dgpu_power_w: Optional[float] = None
+    dgpu_sclk_mhz: Optional[int] = None
+    dgpu_mclk_mhz: Optional[int] = None
+    dgpu_active: bool = False
+    dgpu_name: str = "Discrete GPU"
+
+    # Integrated GPU
+    igpu_temp: Optional[float] = None
+    igpu_name: str = "Integrated GPU"
+
+    # Fans (via acer-nitro-ec)
+    ec_available: bool = False
+    ec_writable: bool = False
+    ec_path: Optional[str] = None
+
+    cpu_fan_rpm: int = 0
+    gpu_fan_rpm: int = 0
+
+    cpu_fan_pct: int = 0
+    gpu_fan_pct: int = 0
+
+    # 0 = Turbo, 1 = Manual, 2 = Auto
+    cpu_fan_mode: int = 2
+    gpu_fan_mode: int = 2
+
+
 class SensorMonitor:
     def __init__(self):
-        self.k10temp_hwmon: Optional[str] = None
+        self.system_model = get_system_model()
+        self.cpu_name = get_cpu_model_name()
+
+        self.cpu_hwmon: Optional[str] = None
         self.dgpu_hwmon: Optional[str] = None
         self.igpu_hwmon: Optional[str] = None
         self.ec_hwmon: Optional[str] = None
+
+        self.dgpu_name: str = "Discrete GPU"
+        self.igpu_name: str = "Integrated GPU"
+
         self.rescan_devices()
 
     def rescan_devices(self):
-        """Discovers hwmon nodes for CPU, GPUs, and EC."""
-        self.k10temp_hwmon = None
+        """Dynamically scans sysfs and hwmon to map sensors without hardcoding."""
+        self.cpu_hwmon = None
         self.dgpu_hwmon = None
         self.igpu_hwmon = None
         self.ec_hwmon = None
 
+        # 1. Fetch GPU hardware labels
+        gpu_labels = get_gpu_descriptions()
+
+        # 2. Inspect all PCI display controllers
+        pci_gpus: Dict[str, Dict[str, Any]] = {}
+        for dev_path in sorted(glob.glob("/sys/bus/pci/devices/*")):
+            class_path = os.path.join(dev_path, "class")
+            if not os.path.exists(class_path):
+                continue
+            pci_class = _read_str(class_path) or ""
+            # VGA (0x0300), 3D (0x0302), Display (0x0380)
+            if pci_class.startswith(("0x0300", "0x0302", "0x0380")):
+                slot = os.path.basename(dev_path)
+                boot_vga_path = os.path.join(dev_path, "boot_vga")
+                is_boot = (_read_str(boot_vga_path) == "1") if os.path.exists(boot_vga_path) else False
+
+                hw_subdirs = glob.glob(os.path.join(dev_path, "hwmon", "hwmon*"))
+                hw_dir = hw_subdirs[0] if hw_subdirs else None
+
+                pci_gpus[dev_path] = {
+                    "slot": slot,
+                    "boot_vga": is_boot,
+                    "hwmon": hw_dir,
+                    "name": gpu_labels.get(slot, "GPU"),
+                }
+
+        # Assign discrete vs integrated based on boot_vga and controller type
+        for dev_path, info in pci_gpus.items():
+            if info["boot_vga"]:
+                self.igpu_hwmon = info["hwmon"]
+                self.igpu_name = info["name"] or "Integrated GPU"
+            else:
+                self.dgpu_hwmon = info["hwmon"]
+                self.dgpu_name = info["name"] or "Discrete GPU"
+
+        # 3. Discover all hwmon nodes (CPU, EC, and fallback GPU)
         for hwmon in sorted(glob.glob("/sys/class/hwmon/hwmon*")):
             name = _read_str(os.path.join(hwmon, "name"))
             if not name:
                 continue
 
-            if name in ("k10temp", "coretemp", "zenpower"):
-                self.k10temp_hwmon = hwmon
+            # CPU thermals: k10temp, coretemp, zenpower, cpu_thermal
+            if name in ("k10temp", "coretemp", "zenpower", "cpu_thermal"):
+                self.cpu_hwmon = hwmon
             elif name == "acer_nitro_ec":
                 self.ec_hwmon = hwmon
-            elif name == "amdgpu":
-                device_link = os.path.realpath(os.path.join(hwmon, "device"))
-                # Discrete GPU (RX 560X) is PCI 01:00.0 on AN515-42
-                if "0000:01:00.0" in device_link:
-                    self.dgpu_hwmon = hwmon
-                elif "0000:04:00.0" in device_link:
-                    self.igpu_hwmon = hwmon
+            elif name in ("amdgpu", "nouveau", "nvidia"):
+                # If hwmon not linked via PCI subpath, match via device link
+                dev_link = os.path.realpath(os.path.join(hwmon, "device"))
+                if dev_link in pci_gpus:
+                    if pci_gpus[dev_link]["boot_vga"]:
+                        self.igpu_hwmon = hwmon
+                    else:
+                        self.dgpu_hwmon = hwmon
                 elif not self.dgpu_hwmon:
                     self.dgpu_hwmon = hwmon
                 elif not self.igpu_hwmon:
                     self.igpu_hwmon = hwmon
 
     def poll(self) -> ThermalSnapshot:
-        """Reads real-time thermal & fan metrics."""
-        # Periodically check if EC driver appeared
+        """Reads real-time thermal & fan metrics without hardcoded values."""
         if not self.ec_hwmon or not os.path.exists(self.ec_hwmon):
             self.rescan_devices()
 
-        snap = ThermalSnapshot()
+        snap = ThermalSnapshot(
+            system_model=self.system_model,
+            cpu_label=self.cpu_name,
+            dgpu_name=self.dgpu_name,
+            igpu_name=self.igpu_name,
+        )
 
-        # 1. CPU Temperature (k10temp)
-        if self.k10temp_hwmon:
-            # Prefer Tctl (temp1)
-            raw = _read_int(os.path.join(self.k10temp_hwmon, "temp1_input"))
+        # 1. CPU Temperature
+        if self.cpu_hwmon:
+            # Check temp1_input (Tctl or Core package)
+            raw = _read_int(os.path.join(self.cpu_hwmon, "temp1_input"))
             if raw and raw > 0:
                 snap.cpu_temp = raw / 1000.0
 
-        # 2. Discrete GPU (RX 560X)
+        # 2. Discrete GPU
         if self.dgpu_hwmon:
             raw_temp = _read_int(os.path.join(self.dgpu_hwmon, "temp1_input"))
             raw_pwr = _read_int(os.path.join(self.dgpu_hwmon, "power1_input"))
@@ -136,7 +276,7 @@ class SensorMonitor:
             if raw_mclk and raw_mclk > 0:
                 snap.dgpu_mclk_mhz = int(raw_mclk / 1_000_000.0)
 
-        # 3. Integrated GPU (Vega)
+        # 3. Integrated GPU
         if self.igpu_hwmon:
             raw_temp = _read_int(os.path.join(self.igpu_hwmon, "temp1_input"))
             if raw_temp and raw_temp > 0:
@@ -172,16 +312,16 @@ class SensorMonitor:
             if gpu_mode is not None:
                 snap.gpu_fan_mode = gpu_mode
 
-            # Fallback for CPU temp if k10temp not available
+            # Fallback for CPU temp if CPU hwmon not read
             if snap.cpu_temp is None:
-                ec_cpu_temp = _read_int(os.path.join(self.ec_hwmon, "temp1_input"))
-                if ec_cpu_temp and ec_cpu_temp > 0:
-                    snap.cpu_temp = ec_cpu_temp / 1000.0
+                ec_cpu = _read_int(os.path.join(self.ec_hwmon, "temp1_input"))
+                if ec_cpu and ec_cpu > 0:
+                    snap.cpu_temp = ec_cpu / 1000.0
 
-            # Fallback for GPU temp if amdgpu asleep
+            # Fallback for GPU temp if discrete GPU sleeping
             if snap.dgpu_temp is None:
-                ec_gpu_temp = _read_int(os.path.join(self.ec_hwmon, "temp2_input"))
-                if ec_gpu_temp and ec_gpu_temp > 0:
-                    snap.dgpu_temp = ec_gpu_temp / 1000.0
+                ec_gpu = _read_int(os.path.join(self.ec_hwmon, "temp2_input"))
+                if ec_gpu and ec_gpu > 0:
+                    snap.dgpu_temp = ec_gpu / 1000.0
 
         return snap

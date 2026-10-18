@@ -2,7 +2,7 @@
 set -e
 
 echo "=========================================================="
-echo "    Acer Nitro 5 EC Driver Uninstaller"
+echo "          Acer Nitro EC Driver Uninstaller"
 echo "=========================================================="
 
 if [ "$EUID" -ne 0 ]; then

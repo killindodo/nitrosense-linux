@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 set -e
 
-# Acer Nitro EC Driver Installer for Acer Nitro 5 (including AN515-42)
+# Acer Nitro EC Driver Installer for Acer Nitro laptops
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 EC_DRIVER_DIR="$PROJECT_DIR/ec-driver"
 
 echo "=========================================================="
-echo "    Acer Nitro 5 (AN515-42) Fan Control Driver Setup"
+echo "         Acer Nitro Fan Control Driver Setup"
 echo "=========================================================="
 
 if [ "$EUID" -ne 0 ]; then
@@ -59,8 +59,8 @@ echo "[+] Configured auto-load on boot: $MODULES_LOAD_FILE"
 UDEV_RULE_FILE="/etc/udev/rules.d/99-acer-nitro-ec.rules"
 cat << 'EOF' > "$UDEV_RULE_FILE"
 # Allow unprivileged users to read and set fan speeds on Acer Nitro EC
-ACTION=="add|change", SUBSYSTEM=="hwmon", ATTR{name}=="acer_nitro_ec", RUN+="/bin/sh -c 'chmod 0666 /sys$$devpath/pwm* 2>/dev/null || true'"
-KERNEL=="hwmon*", ATTRS{name}=="acer_nitro_ec", RUN+="/bin/sh -c 'chmod 0666 /sys$$devpath/pwm* 2>/dev/null || true'"
+ACTION=="add|change", SUBSYSTEM=="hwmon", ATTR{name}=="acer_nitro_ec", RUN+="/bin/sh -c 'chmod 0666 /sys%p/pwm* 2>/dev/null || true'"
+KERNEL=="hwmon*", ATTRS{name}=="acer_nitro_ec", RUN+="/bin/sh -c 'chmod 0666 /sys%p/pwm* 2>/dev/null || true'"
 EOF
 udevadm control --reload-rules || true
 udevadm trigger || true
@@ -72,7 +72,7 @@ if command -v dkms >/dev/null 2>&1; then
     DKMS_SRC="/usr/src/acer-nitro-ec-$DKMS_VER"
     echo "[*] Setting up DKMS for automatic rebuilds on kernel updates..."
     mkdir -p "$DKMS_SRC"
-    cp -r "$EC_DRIVER_DIR"/* "$DKMS_SRC/"
+    cp "$EC_DRIVER_DIR/acer-nitro-ec.c" "$EC_DRIVER_DIR/Makefile" "$EC_DRIVER_DIR/dkms.conf" "$DKMS_SRC/"
     # Ensure dkms.conf has version filled in
     sed -i "s/@PKGVER@/$DKMS_VER/" "$DKMS_SRC/dkms.conf" || true
     

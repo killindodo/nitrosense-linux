@@ -18,7 +18,7 @@ mkdir -p "$DESKTOP_DIR"
 cat << EOF > "$DESKTOP_DIR/nitrosense.desktop"
 [Desktop Entry]
 Name=NitroSense
-Comment=Monitor thermals and control fans on Acer Nitro 5 (by killindodo)
+Comment=Monitor thermals and control fans on Acer Nitro laptops
 Exec=$APP_EXEC
 Icon=$ICON_PATH
 Terminal=false
