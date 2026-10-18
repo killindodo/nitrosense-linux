@@ -28,6 +28,22 @@ KERNEL_VER="$(uname -r)"
 echo "[*] Target kernel: $KERNEL_VER"
 echo "[*] Laptop model: $(cat /sys/class/dmi/id/product_name 2>/dev/null || echo 'Unknown')"
 
+# 0. Check for kernel headers
+if [ ! -d "/lib/modules/$KERNEL_VER/build" ]; then
+    echo "[X] Kernel build headers not found for $KERNEL_VER."
+    echo "[*] Please install kernel headers using your distribution's package manager:"
+    if command -v apt-get >/dev/null 2>&1; then
+        echo "    sudo apt install linux-headers-\$(uname -r) build-essential dkms"
+    elif command -v pacman >/dev/null 2>&1; then
+        echo "    sudo pacman -S linux-headers base-devel dkms"
+    elif command -v dnf >/dev/null 2>&1; then
+        echo "    sudo dnf install kernel-devel kernel-headers dkms"
+    elif command -v zypper >/dev/null 2>&1; then
+        echo "    sudo zypper install kernel-default-devel dkms"
+    fi
+    exit 1
+fi
+
 # 1. Build kernel module
 echo "[*] Building acer-nitro-ec kernel module..."
 cd "$EC_DRIVER_DIR"
@@ -82,6 +98,16 @@ if command -v dkms >/dev/null 2>&1; then
     dkms build -m acer-nitro-ec -v "$DKMS_VER" >/dev/null 2>&1 || true
     dkms install -m acer-nitro-ec -v "$DKMS_VER" >/dev/null 2>&1 || true
     echo "[+] DKMS package registered and installed!"
+else
+    echo "[!] DKMS is not installed. Driver is installed for $KERNEL_VER only."
+    echo "[*] To preserve fan control across kernel updates, install DKMS:"
+    if command -v apt-get >/dev/null 2>&1; then
+        echo "    sudo apt install dkms"
+    elif command -v pacman >/dev/null 2>&1; then
+        echo "    sudo pacman -S dkms"
+    elif command -v dnf >/dev/null 2>&1; then
+        echo "    sudo dnf install dkms"
+    fi
 fi
 
 # 7. Unload previous version if running
@@ -102,6 +128,9 @@ for hwmon in /sys/class/hwmon/hwmon*; do
         echo "[+] Permissions set on $hwmon/pwm*"
     fi
 done
+
+# 10. Clean up build directory
+make -C "$EC_DRIVER_DIR" clean >/dev/null 2>&1 || true
 
 echo ""
 echo "=========================================================="

@@ -473,23 +473,12 @@ static int __init nitro_ec_init(void)
 	if (!model)
 		return -ENODEV;
 
-	if (strstr(model, "AN515-44"))
+	if (strstr(model, "AN515-44")) {
 		regs = &regs_an515_44;
-	else if (strstr(model, "AN515-42") ||
-		 strstr(model, "AN515-43") ||
-		 strstr(model, "AN515-46") ||
-		 strstr(model, "AN515-51") ||
-		 strstr(model, "AN515-52") ||
-		 strstr(model, "AN515-53") ||
-		 strstr(model, "AN515-54") ||
-		 strstr(model, "AN515-55") ||
-		 strstr(model, "AN515-56") ||
-		 strstr(model, "AN515-57") ||
-		 strstr(model, "AN515-58") ||
-		 strstr(model, "AN517-55"))
-		regs = &regs_an515_46;
-	else if (force) {
-		pr_info("force parameter set, using AN515-46 registers for '%s'\n", model);
+	} else if (strstr(model, "AN515") ||
+		 strstr(model, "AN517") ||
+		 strstr(model, "Nitro") ||
+		 force) {
 		regs = &regs_an515_46;
 	}
 
